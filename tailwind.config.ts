@@ -57,6 +57,30 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      backgroundImage: {
+        'gradient-security': 'var(--gradient-security)',
+        'gradient-danger': 'var(--gradient-danger)',
+        'gradient-success': 'var(--gradient-success)',
+      },
+      boxShadow: {
+        'security': 'var(--shadow-security)',
+        'elevated': 'var(--shadow-elevated)',
+        'danger': 'var(--shadow-danger)',
+      },
+      transitionTimingFunction: {
+        'security': 'cubic-bezier(0.4, 0, 0.2, 1)',
       },
       borderRadius: {
         lg: "var(--radius)",
