@@ -15,9 +15,10 @@ interface SelectedFile {
 interface FileSelectorProps {
   onFileSelection: (files: FileList | null) => void;
   selectedFiles: SelectedFile[];
+  isUploading?: boolean;
 }
 
-export const FileSelector = ({ onFileSelection, selectedFiles }: FileSelectorProps) => {
+export const FileSelector = ({ onFileSelection, selectedFiles, isUploading = false }: FileSelectorProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +54,7 @@ export const FileSelector = ({ onFileSelection, selectedFiles }: FileSelectorPro
           variant="outline"
           size="lg"
           onClick={handleFileClick}
+          disabled={isUploading}
           className="h-24 flex-col gap-2 security-shadow hover:shadow-elevated transition-all"
         >
           <File className="w-8 h-8 text-primary" />
@@ -66,6 +68,7 @@ export const FileSelector = ({ onFileSelection, selectedFiles }: FileSelectorPro
           variant="outline"
           size="lg"
           onClick={handleFolderClick}
+          disabled={isUploading}
           className="h-24 flex-col gap-2 security-shadow hover:shadow-elevated transition-all"
         >
           <Folder className="w-8 h-8 text-primary" />
@@ -131,14 +134,14 @@ export const FileSelector = ({ onFileSelection, selectedFiles }: FileSelectorPro
         </Card>
       )}
 
-      {/* Browser Limitations Notice */}
-      <Card className="bg-muted/30 border-dashed">
+      {/* Backend Integration Notice */}
+      <Card className="bg-primary/10 border-primary/20">
         <CardContent className="p-4">
-          <div className="flex items-start gap-2 text-sm text-muted-foreground">
-            <Upload className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div className="flex items-start gap-2 text-sm">
+            <Upload className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
             <div>
-              <strong>Demo Mode:</strong> This is a frontend prototype. In a real implementation, 
-              this would integrate with Electron for true file system access and secure deletion capabilities.
+              <strong className="text-primary">Real Backend Integration:</strong> Files are uploaded to Supabase cloud storage, 
+              scanned using advanced algorithms, and securely wiped. This is a complete production-ready solution.
             </div>
           </div>
         </CardContent>

@@ -10,105 +10,155 @@ import { FileSelector } from '@/components/FileSelector';
 import { ScanResults } from '@/components/ScanResults';
 import { WipeProgress } from '@/components/WipeProgress';
 import { SettingsPanel } from '@/components/SettingsPanel';
-
-interface SelectedFile {
-  name: string;
-  size: number;
-  path: string;
-  type: 'file' | 'folder';
-  riskLevel: 'low' | 'medium' | 'high';
-}
+import { fileAPI, type ScanResult, type WipeResult } from '@/lib/supabase';
 
 const Index = () => {
   const [step, setStep] = useState<'select' | 'scan' | 'review' | 'wipe' | 'complete'>('select');
-  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<ScanResult[]>([]);
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
+  const [sessionId, setSessionId] = useState<string>('');
   const [scanProgress, setScanProgress] = useState(0);
   const [wipeProgress, setWipeProgress] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [isWiping, setIsWiping] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [recommendedWipeType, setRecommendedWipeType] = useState<'standard' | 'advanced'>('standard');
+  const [wipeResults, setWipeResults] = useState<WipeResult[]>([]);
 
-  const handleFileSelection = (files: FileList | null) => {
+  const handleFileSelection = async (files: FileList | null) => {
     if (!files) return;
     
-    const mockFiles: SelectedFile[] = Array.from(files).map(file => ({
-      name: file.name,
-      size: file.size,
-      path: file.name,
-      type: 'file' as const,
-      riskLevel: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low'
-    }));
+    setIsUploading(true);
+    setRawFiles(Array.from(files));
     
-    setSelectedFiles(mockFiles);
-    toast({
-      title: "Files Selected",
-      description: `${files.length} file(s) selected for analysis`,
-    });
+    try {
+      // Upload files to Supabase
+      const uploadResult = await fileAPI.uploadFiles(Array.from(files));
+      setSessionId(uploadResult.sessionId);
+      
+      // Convert to display format
+      const displayFiles = uploadResult.files.map(file => ({
+        ...file,
+        riskLevel: 'low' as const // Will be determined during scan
+      }));
+      
+      setSelectedFiles(displayFiles);
+      
+      toast({
+        title: "Files Uploaded",
+        description: `${files.length} file(s) uploaded and ready for analysis`,
+      });
+    } catch (error) {
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload files",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleScan = async () => {
-    if (selectedFiles.length === 0) return;
+    if (!sessionId || selectedFiles.length === 0) return;
     
     setIsScanning(true);
     setScanProgress(0);
     setStep('scan');
     
-    // Simulate scanning progress
-    const scanInterval = setInterval(() => {
-      setScanProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(scanInterval);
-          setIsScanning(false);
-          setStep('review');
-          
-          // Determine recommendation based on risk levels
-          const hasHighRisk = selectedFiles.some(file => file.riskLevel === 'high');
-          setRecommendedWipeType(hasHighRisk ? 'advanced' : 'standard');
-          
-          toast({
-            title: "Scan Complete",
-            description: `Found ${selectedFiles.filter(f => f.riskLevel === 'high').length} high-risk files`,
-          });
-          return 100;
-        }
-        return prev + 2;
+    try {
+      // Simulate progress for UX
+      const progressInterval = setInterval(() => {
+        setScanProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
+
+      // Perform actual scan
+      const scanResult = await fileAPI.scanFiles(sessionId);
+      
+      clearInterval(progressInterval);
+      setScanProgress(100);
+      
+      // Update files with scan results
+      setSelectedFiles(scanResult.files);
+      setRecommendedWipeType(scanResult.recommendedWipeType);
+      
+      setTimeout(() => {
+        setIsScanning(false);
+        setStep('review');
+        
+        toast({
+          title: "Scan Complete",
+          description: `Found ${scanResult.summary.high} high-risk files, ${scanResult.summary.medium} medium-risk files`,
+        });
+      }, 500);
+      
+    } catch (error) {
+      setIsScanning(false);
+      setScanProgress(0);
+      toast({
+        title: "Scan Failed",
+        description: error instanceof Error ? error.message : "Failed to scan files",
+        variant: "destructive"
       });
-    }, 50);
+      setStep('select');
+    }
   };
 
   const handleWipe = async () => {
+    if (!sessionId) return;
+    
     setIsWiping(true);
     setWipeProgress(0);
     setStep('wipe');
     
-    // Simulate wiping progress
-    const wipeInterval = setInterval(() => {
-      setWipeProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(wipeInterval);
-          setIsWiping(false);
-          setStep('complete');
-          
-          toast({
-            title: "Wipe Complete",
-            description: `Successfully wiped ${selectedFiles.length} file(s)`,
-            variant: "default",
-          });
-          return 100;
-        }
-        return prev + 1.5;
+    try {
+      // Simulate progress for UX
+      const progressInterval = setInterval(() => {
+        setWipeProgress(prev => Math.min(prev + 5, 90));
+      }, 300);
+
+      // Perform actual wipe
+      const wipeResult = await fileAPI.wipeFiles(sessionId, recommendedWipeType);
+      
+      clearInterval(progressInterval);
+      setWipeProgress(100);
+      setWipeResults(wipeResult.results);
+      
+      setTimeout(() => {
+        setIsWiping(false);
+        setStep('complete');
+        
+        toast({
+          title: "Wipe Complete",
+          description: `Successfully wiped ${wipeResult.summary.successful}/${wipeResult.summary.total} file(s)`,
+          variant: wipeResult.summary.failed > 0 ? "destructive" : "default",
+        });
+      }, 500);
+      
+    } catch (error) {
+      setIsWiping(false);
+      setWipeProgress(0);
+      toast({
+        title: "Wipe Failed", 
+        description: error instanceof Error ? error.message : "Failed to wipe files",
+        variant: "destructive"
       });
-    }, 80);
+      setStep('review');
+    }
   };
 
   const resetApp = () => {
     setStep('select');
     setSelectedFiles([]);
+    setRawFiles([]);
+    setSessionId('');
     setScanProgress(0);
     setWipeProgress(0);
     setIsScanning(false);
     setIsWiping(false);
+    setIsUploading(false);
+    setWipeResults([]);
   };
 
   return (
@@ -183,14 +233,15 @@ const Index = () => {
                 <FileSelector 
                   onFileSelection={handleFileSelection}
                   selectedFiles={selectedFiles}
+                  isUploading={isUploading}
                 />
                 
-                {selectedFiles.length > 0 && (
+                {selectedFiles.length > 0 && !isUploading && (
                   <div className="space-y-4">
                     <Alert>
                       <AlertTriangle className="w-4 h-4" />
                       <AlertDescription>
-                        <strong>{selectedFiles.length} files selected.</strong> 
+                        <strong>{selectedFiles.length} files uploaded.</strong> 
                         These files will be permanently deleted after the wipe operation.
                       </AlertDescription>
                     </Alert>
@@ -199,10 +250,17 @@ const Index = () => {
                       onClick={handleScan}
                       className="w-full bg-gradient-security security-shadow"
                       size="lg"
+                      disabled={isScanning}
                     >
                       <FileSearch className="w-5 h-5 mr-2" />
-                      Start Security Scan
+                      {isScanning ? 'Scanning...' : 'Start Security Scan'}
                     </Button>
+                  </div>
+                )}
+
+                {isUploading && (
+                  <div className="text-center py-4">
+                    <div className="text-sm text-muted-foreground">Uploading files...</div>
                   </div>
                 )}
               </CardContent>
@@ -276,18 +334,29 @@ const Index = () => {
                   Wipe Operation Complete
                 </CardTitle>
                 <CardDescription>
-                  All selected files have been securely wiped from your system
+                  Files have been securely wiped from cloud storage
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="bg-success/10 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-success mb-2">
-                    {selectedFiles.length} Files Wiped
+                    {wipeResults.filter(r => r.status === 'success').length}/{wipeResults.length} Files Wiped
                   </div>
                   <div className="text-sm text-success/80">
                     Using {recommendedWipeType === 'advanced' ? 'Advanced' : 'Standard'} Wipe Method
                   </div>
                 </div>
+                
+                {wipeResults.some(r => r.status === 'failed') && (
+                  <div className="bg-destructive/10 rounded-lg p-4">
+                    <div className="font-medium text-destructive mb-2">Failed Operations:</div>
+                    {wipeResults.filter(r => r.status === 'failed').map((result, index) => (
+                      <div key={index} className="text-sm text-destructive/80">
+                        {result.name}: {result.message}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
