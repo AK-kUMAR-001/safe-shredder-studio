@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://your-project.supabase.co' // This will be auto-configured by Lovable
-const supabaseKey = 'your-anon-key' // This will be auto-configured by Lovable
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
@@ -39,7 +39,7 @@ export const fileAPI = {
     files.forEach(file => formData.append('files', file))
     formData.append('sessionId', sessionId)
 
-    const response = await fetch('/functions/v1/upload-files', {
+    const response = await fetch(`${supabaseUrl}/functions/v1/upload-files`, {
       method: 'POST',
       body: formData,
       headers: {
@@ -48,10 +48,13 @@ export const fileAPI = {
     })
 
     if (!response.ok) {
-      throw new Error('Upload failed')
+      const errorText = await response.text()
+      console.error('Upload failed:', errorText)
+      throw new Error(`Upload failed: ${response.status} - ${errorText}`)
     }
 
-    return await response.json()
+    const result = await response.json()
+    return result
   },
 
   // Scan uploaded files for sensitive content
@@ -60,7 +63,7 @@ export const fileAPI = {
     recommendedWipeType: 'standard' | 'advanced',
     summary: { total: number, high: number, medium: number, low: number }
   }> {
-    const response = await fetch('/functions/v1/scan-files', {
+    const response = await fetch(`${supabaseUrl}/functions/v1/scan-files`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -81,7 +84,7 @@ export const fileAPI = {
     results: WipeResult[],
     summary: { total: number, successful: number, failed: number, wipeType: string }
   }> {
-    const response = await fetch('/functions/v1/wipe-files', {
+    const response = await fetch(`${supabaseUrl}/functions/v1/wipe-files`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -149,6 +149,25 @@ const Index = () => {
     }
   };
 
+  const handleStepNavigation = (targetStep: 'select' | 'scan' | 'review' | 'wipe') => {
+    // Allow navigation based on current progress
+    if (targetStep === 'select') {
+      setStep('select');
+    } else if (targetStep === 'scan' && selectedFiles.length > 0) {
+      setStep('scan');
+    } else if (targetStep === 'review' && selectedFiles.length > 0 && selectedFiles.some(f => f.riskLevel)) {
+      setStep('review');
+    } else if (targetStep === 'wipe' && selectedFiles.length > 0) {
+      setStep('wipe');
+    } else {
+      toast({
+        title: "Navigation Not Available",
+        description: "Complete the previous steps first",
+        variant: "destructive"
+      });
+    }
+  };
+
   const resetApp = () => {
     setStep('captcha');
     setSelectedFiles([]);
@@ -204,14 +223,22 @@ const Index = () => {
                 { id: 'wipe', icon: Trash2, label: 'Secure Wipe' },
               ].map((stepItem, index) => (
                 <div key={stepItem.id} className="flex items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    step === stepItem.id || (step === 'complete' && stepItem.id === 'wipe')
-                      ? 'bg-gradient-security text-white' 
-                      : 'bg-muted text-muted-foreground'
-                  }`}>
+                  <button 
+                    onClick={() => handleStepNavigation(stepItem.id as any)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105 ${
+                      step === stepItem.id || (step === 'complete' && stepItem.id === 'wipe')
+                        ? 'bg-gradient-security text-white' 
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer'
+                    }`}
+                  >
                     <stepItem.icon className="w-5 h-5" />
-                  </div>
-                  <span className="ml-2 text-sm font-medium hidden sm:block">{stepItem.label}</span>
+                  </button>
+                  <button 
+                    onClick={() => handleStepNavigation(stepItem.id as any)}
+                    className="ml-2 text-sm font-medium hidden sm:block hover:text-primary transition-colors cursor-pointer"
+                  >
+                    {stepItem.label}
+                  </button>
                   {index < 3 && <div className="w-12 h-0.5 bg-border mx-4 hidden sm:block" />}
                 </div>
               ))}
