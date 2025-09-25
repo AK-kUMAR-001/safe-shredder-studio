@@ -6,21 +6,84 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Sensitive keywords for scanning
-const SENSITIVE_KEYWORDS = [
-  'password', 'ssn', 'social security', 'aadhar', 'aadhaar', 'bank', 'credit card',
-  'passport', 'license', 'tax', 'salary', 'confidential', 'secret', 'private',
-  'personal', 'financial', 'medical', 'insurance', 'login', 'auth', 'token',
-  'key', 'certificate', 'identity', 'driver', 'birth certificate'
+// Enhanced sensitive content detection
+const CRITICAL_KEYWORDS = [
+  'ssn', 'social security number', 'social security', 'ein', 'tax id', 'taxpayer id',
+  'bank account', 'routing number', 'credit card', 'debit card', 'cvv', 'cvc',
+  'passport', 'driver license', 'driver licence', 'national id', 'identity card',
+  'birth certificate', 'death certificate', 'marriage certificate',
+  'medical record', 'patient record', 'health record', 'hospital record',
+  'prescription', 'diagnosis', 'treatment', 'hipaa', 'phi',
+  'salary', 'payroll', 'w2', 'w-2', '1099', 'tax return', 'irs',
+  'classified', 'top secret', 'confidential', 'proprietary', 'trade secret',
+  'api key', 'private key', 'secret key', 'auth token', 'access token',
+  'password', 'passwd', 'pwd', 'pin', 'security code'
 ]
 
 const HIGH_RISK_KEYWORDS = [
-  'ssn', 'social security', 'bank account', 'credit card', 'password', 'secret',
-  'confidential', 'tax return', 'medical record', 'passport'
+  'ssn', 'social security', 'bank account', 'credit card', 'passport', 'driver license',
+  'medical record', 'tax return', 'classified', 'top secret', 'api key', 'private key',
+  'password', 'secret', 'confidential', 'proprietary', 'national id', 'birth certificate'
 ]
 
-function analyzeFileName(fileName: string): 'low' | 'medium' | 'high' {
+const MEDIUM_RISK_KEYWORDS = [
+  'personal', 'private', 'internal', 'restricted', 'sensitive', 'confidential',
+  'employee', 'salary', 'payroll', 'financial', 'insurance', 'legal',
+  'contract', 'agreement', 'license', 'certificate', 'token', 'auth',
+  'login', 'signin', 'account', 'profile', 'identity', 'address',
+  'phone', 'email', 'contact', 'emergency', 'family', 'relationship'
+]
+
+// File extension risk assessment
+const HIGH_RISK_EXTENSIONS = [
+  '.p12', '.pfx', '.pem', '.key', '.crt', '.cer', '.der', '.jks', '.keystore',
+  '.wallet', '.kdb', '.kdbx', '.asc', '.gpg', '.pgp', '.enc'
+]
+
+const MEDIUM_RISK_EXTENSIONS = [
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf',
+  '.csv', '.json', '.xml', '.sql', '.db', '.sqlite', '.mdb', '.accdb'
+]
+
+function analyzeFileName(fileName: string, fileSize: number): 'low' | 'medium' | 'high' {
   const lowerName = fileName.toLowerCase()
+  const fileExtension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'))
+  
+  // Check file extension first
+  if (HIGH_RISK_EXTENSIONS.includes(fileExtension)) {
+    return 'high'
+  }
+  
+  if (MEDIUM_RISK_EXTENSIONS.includes(fileExtension)) {
+    // Further analyze based on filename and size
+    for (const keyword of CRITICAL_KEYWORDS) {
+      if (lowerName.includes(keyword)) {
+        return 'high'
+      }
+    }
+    
+    for (const keyword of HIGH_RISK_KEYWORDS) {
+      if (lowerName.includes(keyword)) {
+        return 'high'
+      }
+    }
+    
+    // Large files with medium-risk extensions get elevated
+    if (fileSize > 10 * 1024 * 1024) { // 10MB+
+      for (const keyword of MEDIUM_RISK_KEYWORDS) {
+        if (lowerName.includes(keyword)) {
+          return 'medium'
+        }
+      }
+    }
+  }
+  
+  // Check for critical keywords in filename
+  for (const keyword of CRITICAL_KEYWORDS) {
+    if (lowerName.includes(keyword)) {
+      return 'high'
+    }
+  }
   
   // Check for high-risk keywords
   for (const keyword of HIGH_RISK_KEYWORDS) {
@@ -30,10 +93,19 @@ function analyzeFileName(fileName: string): 'low' | 'medium' | 'high' {
   }
   
   // Check for medium-risk keywords
-  for (const keyword of SENSITIVE_KEYWORDS) {
+  for (const keyword of MEDIUM_RISK_KEYWORDS) {
     if (lowerName.includes(keyword)) {
       return 'medium'
     }
+  }
+
+  // Pattern matching for common sensitive data patterns
+  if (lowerName.match(/\d{3}-\d{2}-\d{4}/) || // SSN pattern
+      lowerName.match(/\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}/) || // Credit card pattern
+      lowerName.match(/[a-z0-9]{32}/) || // MD5/API key pattern
+      lowerName.match(/[a-z0-9]{40}/) || // SHA1 pattern
+      lowerName.match(/[a-z0-9]{64}/)) { // SHA256 pattern
+    return 'high'
   }
   
   return 'low'
@@ -63,8 +135,8 @@ serve(async (req) => {
     const scannedFiles = []
     
     for (const file of files) {
-      // Analyze filename for sensitive content
-      const riskLevel = analyzeFileName(file.file_name)
+      // Analyze filename and size for sensitive content
+      const riskLevel = analyzeFileName(file.file_name, file.file_size)
       
       // Update scan results in database
       const { error: updateError } = await supabaseClient
@@ -113,7 +185,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error'
       }),
       { 
         status: 500, 

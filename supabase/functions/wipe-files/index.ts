@@ -68,7 +68,7 @@ serve(async (req) => {
             wipe_timestamp: new Date().toISOString(),
             wipe_type: wipeType,
             wipe_status: 'failed',
-            wipe_error: fileError.message
+            wipe_error: fileError instanceof Error ? fileError.message : 'Unknown error'
           })
           .eq('id', file.id)
 
@@ -76,7 +76,7 @@ serve(async (req) => {
           id: file.id,
           name: file.file_name,
           status: 'failed',
-          message: `Failed to wipe: ${fileError.message}`
+          message: `Failed to wipe: ${fileError instanceof Error ? fileError.message : 'Unknown error'}`
         })
       }
     }
@@ -104,7 +104,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error' 
       }),
       { 
         status: 500, 

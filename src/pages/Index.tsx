@@ -10,10 +10,11 @@ import { FileSelector } from '@/components/FileSelector';
 import { ScanResults } from '@/components/ScanResults';
 import { WipeProgress } from '@/components/WipeProgress';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { SecurityCaptcha } from '@/components/SecurityCaptcha';
 import { fileAPI, type ScanResult, type WipeResult } from '@/lib/supabase';
 
 const Index = () => {
-  const [step, setStep] = useState<'select' | 'scan' | 'review' | 'wipe' | 'complete'>('select');
+  const [step, setStep] = useState<'captcha' | 'select' | 'scan' | 'review' | 'wipe' | 'complete'>('captcha');
   const [selectedFiles, setSelectedFiles] = useState<ScanResult[]>([]);
   const [rawFiles, setRawFiles] = useState<File[]>([]);
   const [sessionId, setSessionId] = useState<string>('');
@@ -149,7 +150,7 @@ const Index = () => {
   };
 
   const resetApp = () => {
-    setStep('select');
+    setStep('captcha');
     setSelectedFiles([]);
     setRawFiles([]);
     setSessionId('');
@@ -193,30 +194,38 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between max-w-2xl mx-auto">
-            {[
-              { id: 'select', icon: Upload, label: 'Select Files' },
-              { id: 'scan', icon: Scan, label: 'Scan & Analyze' },
-              { id: 'review', icon: FileSearch, label: 'Review Results' },
-              { id: 'wipe', icon: Trash2, label: 'Secure Wipe' },
-            ].map((stepItem, index) => (
-              <div key={stepItem.id} className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  step === stepItem.id || (step === 'complete' && stepItem.id === 'wipe')
-                    ? 'bg-gradient-security text-white' 
-                    : 'bg-muted text-muted-foreground'
-                }`}>
-                  <stepItem.icon className="w-5 h-5" />
+        {step !== 'captcha' && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between max-w-2xl mx-auto">
+              {[
+                { id: 'select', icon: Upload, label: 'Select Files' },
+                { id: 'scan', icon: Scan, label: 'Scan & Analyze' },
+                { id: 'review', icon: FileSearch, label: 'Review Results' },
+                { id: 'wipe', icon: Trash2, label: 'Secure Wipe' },
+              ].map((stepItem, index) => (
+                <div key={stepItem.id} className="flex items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    step === stepItem.id || (step === 'complete' && stepItem.id === 'wipe')
+                      ? 'bg-gradient-security text-white' 
+                      : 'bg-muted text-muted-foreground'
+                  }`}>
+                    <stepItem.icon className="w-5 h-5" />
+                  </div>
+                  <span className="ml-2 text-sm font-medium hidden sm:block">{stepItem.label}</span>
+                  {index < 3 && <div className="w-12 h-0.5 bg-border mx-4 hidden sm:block" />}
                 </div>
-                <span className="ml-2 text-sm font-medium hidden sm:block">{stepItem.label}</span>
-                {index < 3 && <div className="w-12 h-0.5 bg-border mx-4 hidden sm:block" />}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Step Content */}
+        {step === 'captcha' && (
+          <div className="max-w-md mx-auto">
+            <SecurityCaptcha onVerified={() => setStep('select')} />
+          </div>
+        )}
+
         {step === 'select' && (
           <div className="max-w-2xl mx-auto">
             <Card className="security-shadow">
